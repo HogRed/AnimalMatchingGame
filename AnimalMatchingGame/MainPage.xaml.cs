@@ -2,7 +2,7 @@
 {
     public partial class MainPage : ContentPage
     {
-        int count = 0;
+        int totalTenthsOfSeconds = 300; // total time in tenths of seconds (30 seconds)
 
         public MainPage()
         {
@@ -15,47 +15,56 @@
             PlayAgainButton.IsVisible = false; // make play again button invisible
 
             // list of animal emoji pairs
-            // used Win + ; key for native emoji keyboard
-            List<string> animalEmoji = [
-                "🐫","🐫",
-                "🐮","🐮",
-                "🐶","🐶",
-                "🐨","🐨",
-                "🐼","🐼",
-                "🐲","🐲",
-                "🐏","🐏",
-                "🐗","🐗",
-                ];
+            List<string> animalEmoji = new List<string>
+                        {
+                            "🐫","🐮","🐶","🐨","🐼","🐲","🐏","🐗",
+                            "🐵","🦓","🐅","🐔","🦒","🦦","🦈","🐬",
+                            "🦐","🦑","🦞","🦀"
+                        };
+
+            // select 8 unique emojis, generate pairs, shuffle, and assign to buttons
+            var selectedEmojis = animalEmoji.OrderBy(a => Guid.NewGuid()).Take(8).ToList();
+            var emojiPairs = selectedEmojis.SelectMany(e => new List<string> { e, e }).OrderBy(a => Guid.NewGuid()).ToList();
 
             // iterate over each button in AnimalButtons,
-            // randomly assign it an animal emoji, and remove
-            // that emoji from the list so it's not reused.
+            // assign it an animal emoji from the shuffled list
+            int i = 0;
             foreach (var button in AnimalButtons.Children.OfType<Button>())
             {
-                int index = Random.Shared.Next(animalEmoji.Count);
-                string nextEmoji = animalEmoji[index];
-                button.Text = nextEmoji;
-                animalEmoji.RemoveAt(index);
+                button.Text = emojiPairs[i];
+                i++;
             }
+
+            // reset the timer
+            tenthsOfSecondsElapsed = totalTenthsOfSeconds;
 
             // start a timer that execute TimerTick every 0.1 seconds
             Dispatcher.StartTimer(TimeSpan.FromSeconds(.1), TimerTick);
         }
 
-        int tenthsOfSecondsElapsed = 0; // keep track of elapsed time in tenths of seconds
+        int tenthsOfSecondsElapsed; // keep track of remaining time in tenths of seconds
 
         private bool TimerTick()
         {
-            if(!this.IsLoaded) return false; // stop the timer if the page is not loaded
+            if (!this.IsLoaded) return false; // stop the timer if the page is not loaded
 
-            tenthsOfSecondsElapsed++; // increment the elapsed time
+            tenthsOfSecondsElapsed--; // decrement the remaining time
 
-            TimeElapsed.Text = "Time Elapsed: " +
-                (tenthsOfSecondsElapsed / 10F).ToString("0.0s"); // update the label with elapsed time
+            TimeElapsed.Text = "Time Remaining: " +
+                ((tenthsOfSecondsElapsed) / 10F).ToString("0.0s"); // update the label with remaining time
+                                                                       // sub one to account for extra tick at game conclusion
+
+            if (tenthsOfSecondsElapsed <= 0) // check if time has run out
+            {
+                // end the game
+                AnimalButtons.IsVisible = false; // hide animal buttons
+                PlayAgainButton.IsVisible = true; // show play again button
+                return false; // stop the timer
+            }
 
             if (PlayAgainButton.IsVisible) // check if the play again button is visible
             {
-                tenthsOfSecondsElapsed = 0; // reset the elapsed time
+                tenthsOfSecondsElapsed = totalTenthsOfSeconds; // reset the elapsed time
                 return false; // stop the timer
             }
 
@@ -66,6 +75,9 @@
         Button lastClicked;
         bool findingMatch = false;
         int matchesFound;
+
+        // keep track of best time
+        private float bestTime = float.MaxValue;
 
         private void Button_Clicked(object sender, EventArgs e)
         {
@@ -95,7 +107,20 @@
 
             if (matchesFound == 8) // check if all matches are found
             {
-                matchesFound = 0; // reset matches found for next game
+                // Calculate elapsed time in seconds
+                float currentTime = ((totalTenthsOfSeconds - tenthsOfSecondsElapsed) + 1) / 10F; // +1 to account for the extra tick at the end
+
+                // Update current time
+                CurrentTime.Text = "Current Time: " + currentTime.ToString("0.0s");
+
+                // Update bestTime if the current time is better (i.e., lower)
+                if (currentTime < bestTime)
+                {
+                    bestTime = currentTime;
+                    BestTime.Text = "Best Time: " + bestTime.ToString("0.0s");
+                }
+
+                matchesFound = 0; // reset for the next game
                 AnimalButtons.IsVisible = false; // hide animal buttons
                 PlayAgainButton.IsVisible = true; // show play again button
             }
